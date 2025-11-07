@@ -102,7 +102,7 @@ ShiftCaracterToAnAdress:
     push ebp
     mov ebp, esp
 
-    mov ebp, [ebp + 8] ; this contains the length of the shift ! 
+    mov edi, [ebp + 8] ; this contains the length of the shift ! 
 
     mov eax, [ShiftAdress]
     sub eax, esi ; extracts the length of the first shift
@@ -122,7 +122,7 @@ ShiftCaracterToAnAdress:
     int 0x80
 
     ; shift to the correct position
-    mov eax, ebp
+    mov eax, edi
 
     push eax
     call _convert_in_ASCII
@@ -137,7 +137,7 @@ ShiftCaracterToAnAdress:
     mov ecx, Shift
     mov edx, [esi + 4]
     int 0x80
-        
+
     pop ebp
     ret
     
@@ -151,9 +151,8 @@ _convert_in_ASCII:
     mov eax, [ebp + 8]
 
     mov esi, temp1
-    mov edx, 0
     ; this produces first an inversed number that'll have to be reversed.
-loop3: 
+loop1: 
     mov ebx, 10
     xor edx, edx
     div ebx
@@ -163,7 +162,7 @@ loop3:
     cmp eax, 0
     je code1
     jmp loop3
-code1:    
+code2:    
     mov eax, esi
     sub eax, temp1
     mov [index], eax
@@ -186,3 +185,25 @@ code2:
     ret 
 
 
+_convert_in_Binary:
+    push ebp
+    xor eax, eax
+    xor ecx, ecx
+    mov esi, [ebp + 8]
+    mov edx, [ebp + 12]
+loop3:
+    inc ecx
+    mov [esi], al
+    mov ebx, al
+    sub ebx, '0'
+    mul eax, eax, 10
+    add eax, ebx
+    cmp ecx, ebx
+    je return
+    jmp loop3
+return:
+    pop ebp
+    ret
+
+
+    
