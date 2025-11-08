@@ -6,6 +6,9 @@ segment .data
     ShiftAdress db 307
     ShiftLeft db 27, '[', 'D'
     ShiftRight db 27, '[', 'C'
+    Empty db '                                '
+    filename db 'Operations.log', 0
+    permissions equ 0644
 segment .bss
     results resb 8
     temp1 resb 32
@@ -19,15 +22,16 @@ segment .bss
     SecondNumberOperator resb 1
     termiosSaved resb 36 ; contains all termios settings
     termios resb 36
-    buffer resb 0 ; all entered characters end up here 
+    buffer resb 1 ; all entered characters end up here
+    LargeBuffer resb 34 
 segment .text
     global _start
 _start:
-    ; printing the calcultor general form
+    ; create the log file
     mov eax, 4
-    mov ebx, 1
-    mov ecx, CalculatorText
-    mov edx, 307
+    mov ebx, filename
+    mov ecx, 0x51 ; O_CREAT (0x40) + O_WRONLY (0x1)
+    mov edx, permissions
     int 0x80
 
     ; recover termios settings
@@ -44,6 +48,16 @@ _start:
     mov [termios + 12], eax
 
 MainLoop:
+    ; shift to the initial adress
+    mov eax, 0
+    push eax
+    call ShiftCursorToAnAdress
+    ; printing the calcultor general form
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, CalculatorText
+    mov edx, 307
+    int 0x80
     ; read the user input
     mov eax, 3
     mov ebx, 0
@@ -62,18 +76,18 @@ MainLoop:
     cmp BoolState, 2
     je case2
 case1:
-    add AdressWhereToWrite, 8
+    mov AdressWhereToWrite, 8
+    cmp numberOfCaractersInNumberOne, 9
+    jmp MainLoop
+    inc numberOfCaractersInNumberOne
     add AdressWhereToWrite, numberOfCaractersInNumberOne
-    mov esi, number1
-    mov edi, numberOfCaractersInNumberOne
-    mov [esi + edi], [buffer]
     jmp PrintNumber
 case2:
-    add AdressWhereToWrite, 22
+    mov AdressWhereToWrite, 22
+    cmp numberOfCaractersInNumberTwo, 9
+    jmp MainLoop
+    inc numberOfCaractersInNumberTwo
     add AdressWhereToWrite, numberOfCaractersInNumberTwo
-    mov esi, number2
-    mov edi, numberOfCaractersInNumberTwo
-    mov [esi + edi], [buffer]
     jmp PrintNumber
 NonNumericCaracter:
     cmp buffer, '*'
@@ -100,17 +114,158 @@ NonNumericCaracter:
     cmp buffer, 'q'
     je Exit
     cmp buffer, 'r'
-    je MainLoop
+    je AC
 PrintOperation:
+    ; move to the right index
+    mov eax, 22
+    push eax
+    call ShiftCursorToAnAdress
+    ; print the operation
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, buffer
+    mov edx, 1
+    int 0x80
+    ; fill the operator variable
+    mov operator, buffer
+    mov byte [BoolState], 2
 DoSquareRoot:
 SeeHistory:
 PrintResult:
+    ; convert first number in binary
+    mov eax, number1
+    mov ebx, numberOfCaractersInNumberOne
+    push eax
+    push ebx
+    call _convert_in_Binary
+    mov esi, eax
+    ; convert second number in binary
+    mov eax, number2
+    mov ebx, numberOfCaractersInNumberTwo
+    push eax
+    push ebx
+    call _convert_in_Binary
+    mov edi, eax
+    ; do the operation
+    cmp operator, '+'
+    je Addition
+    cmp operator, '-'
+    je Substraction
+    cmp operator, '*'
+    je Multiplication
+    cmp operator, '/'
+    je Division
+    cmp operator, '^'
+    je Power
+Addition:
+    add esi, edi
+    mov eax, esi
+    jmp Reset
+Substraction:
+    sub esi, edi
+    mov eax, edi
+    jmp Reset
+Division:
+    mov eax, esi
+    mov ebx, edi
+    xor edx, edx
+    div ebx
+    jmp Reset
+Multiplication:
+    mov eax, esi
+    mov ebx, edi
+    mul ebx
+    jmp Reset
+Power:
+    mov ebx, 0
+    mov eax, esi
+loop5:
+    cmp ebx, edi
+    jmp Reset
+    inc ebx
+    mul ebx
+Reset:
+    ; shift to the initial adress
+    mov ebx, 0
+    push ebx
+    call ShiftCursorToAnAdress
+    ; Convert in ASCII
+    push eax
+    call _convert_in_ASCII
+    ; write in the log file
+    mov ecx, [number1]
+    mov [LargeBuffer], ecx
+    mov ecx, [number1 + 4]
+    mov [LargeBuffer + 4], ecx
+    mov cl, [number1 + 8]
+    mov [LargeBuffer + 8], cl
+    mov [LargeBuffer + 9], ' '
+    mov cl, [operator]
+    mov [LargeBuffer + 10], cl
+    mov [LargeBuffer + 11], ' '
+    mov ecx, [number2]
+    mov [LargeBuffer + 12], ecx
+    mov ecx, [number2 + 4]
+    mov [LargeBuffer + 16], ecx
+    mov cl, [number1 + 8]
+    mov [LargeBuffer + 17], cl
+    mov [LargeBuffer + 21], ' '
+    mov [LargeBuffer + 22], '='
+    mov [LargeBuffer + 23], ' '
+    mov ecx, [eax]
+    mov [LargeBuffer + 24], eax
+    mov ecx, [eax + 4]
+    mov [LargeBuffer + 28], ecx
+    mov cl, [eax + 8]
+    mov [LargeBuffer + 32], cl 
+    mov [LargeBuffer + 33], 10
+    mov eax, esi
+    mov eax, 4
+    mov ebx, filename
+    mov ecx, LargeBuffer
+    mov edx, 34
+    int 0x80
+    ; reset the high bar
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, Empty
+    mov edx, 32
+    int 0x80
+    ; shift to the correct adress
+    mov ebx, 15
+    push ebx
+    call ShiftCursorToAnAdress
+    ; print the result
+    mov [LargeBuffer], '='
+    mov [LargeBuffer + 1], ' '
+    mov ecx, [esi]
+    mov [LargeBuffer + 2], ecx
+    mov ecx, [esi + 4]
+    mov [LargeBuffer + 6], ecx
+    mov cl, [esi + 8]
+    mov [LargeBuffer + 10], cl
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, LargeBuffer
+    mov edx, 11
+    int 0x80
+
+    jmp AC
+AC:
+    mov numberOfCaractersInNumberOne, 0
+    mov numberOfCaractersInNumberTwo, 0
+    mov qword [number1], 0
+    mov byte [number1 + 8], 0
+    mov qword [number2], 0
+    mov byte [number2 + 8], 0
+    mov byte [operator], 0
+    jmp MainLoop
+
 DeleteLastEnteredCaraceter:
 PrintNumber:
     ; set the cursor at the right position
-    mov eax, 4
-    mov ebx, 1
-    mov ecx, [shiftTable + AdressWhereToWrite]
+    push eax, AdressWhereToWrite
+    call ShiftCursorToAnAdress
     ; print the number
     mov eax, 4
     mov ebx, 1
@@ -134,7 +289,7 @@ Exit:
 
 
 
-ShiftCaracterToAnAdress:
+ShiftCursorToAnAdress:
     push ebp
     mov ebp, esp
 

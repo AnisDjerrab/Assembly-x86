@@ -131,7 +131,7 @@ program:
     int 0x80
 
 
-_convert_in_ASCII:
+div:
     push ebp
     mov ebp, esp
 
