@@ -15,7 +15,7 @@ segment .bss
     results resb 8
     temp1 resb 32
     temp2 resb 32
-    Shift resb 6
+    Shift resb 7
     AdressWhereToWrite resb 4
     number1 resb 9
     number2 resb 9
@@ -155,6 +155,8 @@ DoSquareRoot:
 FirstCase:
     mov eax, number1
     push eax
+    mov ebx, numberOfCaractersInNumberOne
+    push ebx
     call _convert_in_Binary
     push eax
     call _SquareRoot
@@ -165,14 +167,17 @@ FirstCase:
     push ebx
     call ShiftCursorToAnAdress
     ; print the new number
+    mov esi, eax
     mov eax, 4
     mov ebx, 1
-    mov ecx, [eax]
-    mov edx, [eax + 4]
+    mov ecx, [esi]
+    mov edx, [esi + 4]
     int 0x80
 SecondCase:
     mov eax, number2
     push eax
+    mov ebx, numberOfCaractersInNumberTwo
+    push ebx
     call _convert_in_Binary
     push eax
     call _SquareRoot
@@ -259,7 +264,7 @@ Addition:
     jmp Reset
 Substraction:
     sub esi, edi
-    mov eax, edi
+    mov eax, esi
     jmp Reset
 Division:
     mov eax, esi
@@ -277,16 +282,17 @@ Power:
     mov eax, esi
 loop5:
     cmp ebx, edi
-    jmp Reset
+    je Reset
     inc ebx
     mul ebx
 Reset:
+    mov edi, eax
     ; shift to the initial adress
     mov ebx, 0
     push ebx
     call ShiftCursorToAnAdress
     ; Convert in ASCII
-    push eax
+    push edi
     call _convert_in_ASCII
     ; write in the log file
     mov ecx, [number1]
@@ -309,7 +315,7 @@ Reset:
     mov [LargeBuffer + 22], '='
     mov [LargeBuffer + 23], ' '
     mov ecx, [eax]
-    mov [LargeBuffer + 24], eax
+    mov [LargeBuffer + 24], ecx
     mov ecx, [eax + 4]
     mov [LargeBuffer + 28], ecx
     mov cl, [eax + 8]
@@ -366,7 +372,7 @@ DeleteCaracterOfNumberOne:
     dec [numberOfCaractersInNumberOne]
     mov edi, [numberOfCaractersInNumberOne]
     mov esi, [number1 + edi]
-    mov esi, ' '
+    mov [esi], ' '
     ; change the cursor position
     mov eax, 9
     push eax
@@ -383,7 +389,7 @@ DeleteCaracterOfNumberTwo:
     dec [numberOfCaractersInNumberTwo]
     mov edi, [numberOfCaractersInNumberTwo]
     mov esi, [number2 + edi]
-    mov esi, ' '
+    mov [esi], ' '
     ; change the cursor position
     mov eax, 22
     push eax
@@ -398,7 +404,7 @@ DeleteCaracterOfNumberTwo:
     jmp MainLoop
 PrintNumber:
     ; set the cursor at the right position
-    mov eax, AdressWhereToWrite
+    mov eax, [AdressWhereToWrite]
     push eax
     call ShiftCursorToAnAdress
     ; print the number
@@ -430,22 +436,24 @@ ShiftCursorToAnAdress:
 
     mov edi, [ebp + 8] ; this contains the length of the shift ! 
 
-    mov eax, [ShiftAdress]
-    sub eax, esi ; extracts the length of the first shift
+    mov eax, [ShiftAdress] ; length of the first shift
 
     push eax
     call _convert_in_ASCII
 
-    mov esi, [eax]
+    mov esi, eax
     mov eax, [ShiftLeft]
     mov [Shift], eax
-    mov [Shift + 3], esi
+    mov eax, [esi]
+    mov [Shift + 3], eax
 
     ; reset the cursor postion to zero
+    mov edi, [esi + 4]
+    add edi, 3
     mov eax, 4
     mov ebx, 1
     mov ecx, Shift
-    mov edx, [esi + 4]
+    mov edx, edi
     int 0x80
 
     ; shift to the correct position
@@ -459,13 +467,18 @@ ShiftCursorToAnAdress:
     mov [Shift], eax
     mov eax, [esi]
     mov [Shift + 3], eax
-
+    
     ; print the shift
+    mov edi, [esi + 4]
+    add edi, 3
     mov eax, 4
     mov ebx, 1
     mov ecx, Shift
-    mov edx, [esi + 4]
+    mov edx, edi
     int 0x80
+
+    mov eax, [ebp + 8]
+    mov [ShiftAdress], eax
 
     mov esp, ebp
     pop ebp
@@ -520,18 +533,20 @@ code6:
 
 _convert_in_Binary:
     push ebp
+    mov ebp, esp
     mov esi, [ebp + 8]
     mov edx, [ebp + 12]
     xor edi, edi
     xor eax, eax
 loop3:
     inc edi
-    inc [edx]
-    sub [edx], '0'
+    mov bl, [esi + edi]
+    sub bl, '0'
     mov ebx, 10
     mul ebx
-    add eax, [edx]
-    cmp [esi], edi
+    mov [ebx], bl
+    add eax, ebx
+    cmp [edx], edi
     je return
     jmp loop3
 return:
