@@ -1,5 +1,5 @@
 segment .data
-    CalculatorText db "                                ", 10, " sqrt()   DEL     OFF      AC   ", 10, "   7      8       9        /    ", 10, "   4      5       6        *    ", 10, "   1      2       3        +    ", 10, "   ^      0       =        +    ", 10, 10, "Press [h] to see your history", 10, "Press [SUPPR] for DEL", 10, "Press [x] for OFF", 10, "Press [r] for AC", 10, "Press [s] for sqrt()", 10
+    CalculatorText db "                                ", 10, " sqrt()   DEL     OFF      AC   ", 10, "   7      8       9        /    ", 10, "   4      5       6        *    ", 10, "   1      2       3        +    ", 10, "   ^      0       =        +    ", 10, 10, "Press [h] to see your history", 10, "Press [SUPPR] for DEL", 10, "Press [q] for OFF", 10, "Press [r] for AC", 10, "Press [s] for sqrt()", 10
     numberOfCaractersInNumberOne db 0
     numberOfCaractersInNumberTwo db 0
     BoolState db 1
@@ -75,7 +75,37 @@ case2:
     mov edi, numberOfCaractersInNumberTwo
     mov [esi + edi], [buffer]
     jmp PrintNumber
-NonNumericCaraceter:
+NonNumericCaracter:
+    cmp buffer, '*'
+    mov buffer, 'X'
+    je PrintOperation
+    cmp buffer, 'X'
+    je PrintOperation
+    cmp buffer, '/'
+    je PrintOperation
+    cmp buffer, '+'
+    je PrintOperation
+    cmp buffer, '-'
+    je PrintOperation
+    cmp buffer, '^'
+    je PrintOperation
+    cmp buffer, 's'
+    je DoSquareRoot
+    cmp buffer, 'h'
+    je SeeHistory
+    cmp buffer, '='
+    je PrintResult
+    cmp buffer, 8
+    je DeleteLastEnteredCaraceter
+    cmp buffer, 'q'
+    je Exit
+    cmp buffer, 'r'
+    je MainLoop
+PrintOperation:
+DoSquareRoot:
+SeeHistory:
+PrintResult:
+DeleteLastEnteredCaraceter:
 PrintNumber:
     ; set the cursor at the right position
     mov eax, 4
@@ -90,6 +120,12 @@ PrintNumber:
     jmp MainLoop
 
 Exit:
+    ; restauring termios
+    mov eax, 54
+    mov ebx, 0
+    mov ecx, 0x5402
+    mov edx, termiosSaved
+    int 0x80
     ; exiting the program
     mov eax, 1
     xor ebx, ebx
@@ -193,8 +229,8 @@ _convert_in_Binary:
     mov edx, [ebp + 12]
 loop3:
     inc ecx
-    mov [esi], al
-    mov ebx, al
+    mov [esi], dl
+    mov ebx, dl
     sub ebx, '0'
     mul eax, eax, 10
     add eax, ebx

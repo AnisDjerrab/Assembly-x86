@@ -56,7 +56,7 @@ loop1:
     je temp
     sub bl, '0' ; les chiffres dans l'ASCII commencent de 0 a 9 -- en soustrayant le 0, on s'assure que le 0x00 = '0'
     imul eax, eax, 10
-    movzx ebx, bl ; efface le sbits superieurs
+    movzx ebx, bl ; efface les bits superieurs
     add eax, ebx
     inc esi
     jmp loop1
