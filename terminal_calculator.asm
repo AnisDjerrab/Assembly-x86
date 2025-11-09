@@ -158,7 +158,7 @@ FirstCase:
     mov ebx, numberOfCaractersInNumberOne
     push ebx
     call _convert_in_Binary
-    push eax
+    push [eax]
     call _SquareRoot
     push eax
     call _convert_in_ASCII
@@ -183,6 +183,8 @@ SecondCase:
     call _SquareRoot
     push eax
     call _convert_in_ASCII
+    mov esi, [eax]
+    mov edi, [eax + 4]
     ; set cursor position 
     mov ebx, 22
     push ebx
@@ -190,8 +192,8 @@ SecondCase:
     ; print the new number
     mov eax, 4
     mov ebx, 1
-    mov ecx, [eax]
-    mov edx, [eax + 4]
+    mov ecx, esi
+    mov edx, edi 
     int 0x80
 SeeHistory:
     ; open the file
@@ -535,19 +537,19 @@ _convert_in_Binary:
     push ebp
     mov ebp, esp
     mov esi, [ebp + 8]
-    mov edx, [ebp + 12]
+    mov ecx, [ebp + 12]
     xor edi, edi
     xor eax, eax
 loop3:
-    inc edi
+    cmp [ecx], edi
+    je return
     mov bl, [esi + edi]
     sub bl, '0'
+    inc edi
     mov ebx, 10
     mul ebx
-    mov [ebx], bl
+    movzx ebx, bl ; moves the value of bl inside ebx, and erase the other 24 bits
     add eax, ebx
-    cmp [edx], edi
-    je return
     jmp loop3
 return:
     mov esp, ebp
@@ -558,6 +560,7 @@ return:
     
 _SquareRoot:
     push ebp 
+    mov ebp, esp
     mov esi, [ebp + 8]
     
     mov eax, esi
@@ -572,7 +575,7 @@ newtonLoop:
     cmp edi, eax
     je quit
     mov edi, eax
-    mov eax, [esi]
+    mov eax, esi
     mov ebx, edi
     xor edx, edx
     div ebx
