@@ -4,13 +4,17 @@ segment .data
     numberOfCaractersInNumberOne db 0
     numberOfCaractersInNumberTwo db 0
     BoolState db 1
-    ShiftAdress dd 0
-    ShiftLeft db 27, '[', 'D'
-    ShiftRight db 27, '[', 'C'
-    Empty db '                                '
+    ShiftAdress dd 1
+    ShiftCommun db 27, '['
+    ShiftLeft db 'D'
+    ShiftRight db 'C'
+    Empty db "                                "
     filename db 'Operations.log', 0
     permissions equ 0644
     InHistory db 0
+    shiftToRowZero db 27, "[12A"
+    shiftToRowTwelve db 27, "[12B"
+    shiftToBeginningOfLine db 27, "[1G"
 segment .bss
     results resb 8
     temp1 resb 32
@@ -55,18 +59,26 @@ _start:
     and eax, 0xFFFFFFF5
     mov [termios + 12], eax
 
+    ; apply
+    mov eax, 54
+    mov ebx, 0
+    mov ecx, 0x5402
+    mov edx, termios
+    int 0x80
+
 CalculatorRestart:
-    ; shift to the initial adress
-    mov eax, 0
-    push eax
-    call ShiftCursorToAnAdress
     ; printing the calcultor general form
     mov eax, 4
     mov ebx, 1
     mov ecx, CalculatorText
     mov edx, 307
     int 0x80
-
+    ; shift UP
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, shiftToRowZero
+    mov edx, 5
+    int 0x80
 MainLoop:
     ; read the user input
     mov eax, 3
@@ -87,32 +99,34 @@ MainLoop:
     je case1
     cmp [BoolState], 2
     je case2
+    jmp MainLoop
 case1:
     mov [AdressWhereToWrite], 8
     cmp [numberOfCaractersInNumberOne], 9
-    jmp MainLoop
+    je MainLoop
+    mov dl, [buffer]
+    mov ecx, numberOfCaractersInNumberOne
+    mov [number1 + ecx], dl
     inc [numberOfCaractersInNumberOne]
     mov eax, [numberOfCaractersInNumberOne]
-    add [AdressWhereToWrite], eax
+    add eax, [AdressWhereToWrite]
     jmp PrintNumber
 case2:
     mov [AdressWhereToWrite], 22
     cmp [numberOfCaractersInNumberTwo], 9
-    jmp MainLoop
+    je MainLoop
+    mov dl, [buffer]
+    mov ecx, numberOfCaractersInNumberTwo
+    mov [number2 + ecx], dl
     inc [numberOfCaractersInNumberTwo]
     mov eax, [numberOfCaractersInNumberTwo]
-    add [AdressWhereToWrite], eax
+    add eax, [AdressWhereToWrite]
     jmp PrintNumber
 case3:
     cmp [buffer], 'q'
     mov [InHistory], 0
     jmp AC
 NonNumericCaracter:
-    cmp [buffer], '*'
-    mov [buffer], 'X'
-    je PrintOperation
-    cmp [buffer], 'X'
-    je PrintOperation
     cmp [buffer], '/'
     je PrintOperation
     cmp [buffer], '+'
@@ -133,6 +147,9 @@ NonNumericCaracter:
     je Exit
     cmp [buffer], 'r'
     je AC
+    cmp [buffer], '*'
+    je PrintOperation
+    jmp MainLoop
 PrintOperation:
     ; move to the right index
     mov eax, 22
@@ -148,6 +165,7 @@ PrintOperation:
     mov eax, [buffer]
     mov [operator], eax
     mov [BoolState], 2
+    jmp MainLoop
 DoSquareRoot:
     cmp [BoolState], 1
     je FirstCase
@@ -158,7 +176,7 @@ FirstCase:
     mov ebx, numberOfCaractersInNumberOne
     push ebx
     call _convert_in_Binary
-    push [eax]
+    push eax
     call _SquareRoot
     push eax
     call _convert_in_ASCII
@@ -219,7 +237,7 @@ SeeHistory:
     mov ebx, esi
     int 0x80
     ; set cursor position to max
-    mov ebx, 0
+    mov ebx, 1
     push ebx
     call ShiftCursorToAnAdress
     ; write
@@ -260,6 +278,7 @@ PrintResult:
     je Division
     cmp [operator], '^'
     je Power
+    jmp AC
 Addition:
     add esi, edi
     mov eax, esi
@@ -288,14 +307,22 @@ loop5:
     inc ebx
     mul ebx
 Reset:
-    mov edi, eax
     ; shift to the initial adress
-    mov ebx, 0
-    push ebx
+    mov ebx, eax
+    push eax
     call ShiftCursorToAnAdress
     ; Convert in ASCII
-    push edi
+    mov eax, ebx
+    push eax
     call _convert_in_ASCII
+    mov edi, eax
+    ; open the log file
+    mov eax, 5
+    mov ebx, filename
+    mov ecx, 0
+    int 0x80
+    mov esi, eax
+    mov eax, edi
     ; write in the log file
     mov ecx, [number1]
     mov [LargeBuffer], ecx
@@ -311,22 +338,26 @@ Reset:
     mov [LargeBuffer + 12], ecx
     mov ecx, [number2 + 4]
     mov [LargeBuffer + 16], ecx
-    mov cl, [number1 + 8]
+    mov cl, [number2 + 8]
     mov [LargeBuffer + 17], cl
-    mov [LargeBuffer + 21], ' '
-    mov [LargeBuffer + 22], '='
-    mov [LargeBuffer + 23], ' '
+    mov [LargeBuffer + 18], ' '
+    mov [LargeBuffer + 19], '='
+    mov [LargeBuffer + 20], ' '
     mov ecx, [eax]
-    mov [LargeBuffer + 24], ecx
+    mov [LargeBuffer + 21], ecx
     mov ecx, [eax + 4]
-    mov [LargeBuffer + 28], ecx
+    mov [LargeBuffer + 25], ecx
     mov cl, [eax + 8]
-    mov [LargeBuffer + 32], cl 
-    mov [LargeBuffer + 33], 10
+    mov [LargeBuffer + 31], cl 
+    mov [LargeBuffer + 32], 10
     mov eax, 4
-    mov ebx, filename
+    mov ebx, esi
     mov ecx, LargeBuffer
     mov edx, 34
+    int 0x80
+    ; close the file
+    mov eax, 6
+    mov ebx, esi
     int 0x80
     ; reset the high bar
     mov eax, 4
@@ -341,11 +372,13 @@ Reset:
     ; print the result
     mov [LargeBuffer], '='
     mov [LargeBuffer + 1], ' '
-    mov ecx, [esi]
-    mov [LargeBuffer + 2], ecx
-    mov ecx, [esi + 4]
-    mov [LargeBuffer + 6], ecx
-    mov cl, [esi + 8]
+    mov esi, [edi]
+    mov ecx, esi
+    mov esi, [ecx + 23]
+    mov [LargeBuffer + 2], esi
+    mov esi, [ecx + 27]
+    mov [LargeBuffer + 6], esi
+    mov cl, [ecx + 31]
     mov [LargeBuffer + 10], cl
     mov eax, 4
     mov ebx, 1
@@ -406,7 +439,6 @@ DeleteCaracterOfNumberTwo:
     jmp MainLoop
 PrintNumber:
     ; set the cursor at the right position
-    mov eax, [AdressWhereToWrite]
     push eax
     call ShiftCursorToAnAdress
     ; print the number
@@ -418,6 +450,12 @@ PrintNumber:
     jmp MainLoop
 
 Exit:
+    ; shift to the original row
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, shiftToRowZero
+    mov edx, 5
+    int 0x80
     ; restauring termios
     mov eax, 54
     mov ebx, 0
@@ -438,24 +476,11 @@ ShiftCursorToAnAdress:
 
     mov edi, [ebp + 8] ; this contains the length of the shift ! 
 
-    mov eax, [ShiftAdress] ; length of the first shift
-
-    push eax
-    call _convert_in_ASCII
-
-    mov esi, eax
-    mov eax, [ShiftLeft]
-    mov [Shift], eax
-    mov eax, [esi]
-    mov [Shift + 3], eax
-
-    ; reset the cursor postion to zero
-    mov edi, [esi + 4]
-    add edi, 3
+    ; first, shift to the beginning of line
     mov eax, 4
     mov ebx, 1
-    mov ecx, Shift
-    mov edx, edi
+    mov ecx, shiftToBeginningOfLine
+    mov edx, 4
     int 0x80
 
     ; shift to the correct position
@@ -465,10 +490,17 @@ ShiftCursorToAnAdress:
     call _convert_in_ASCII
 
     mov esi, eax
-    mov eax,  [ShiftRight]
+    mov eax, [ShiftCommun]
     mov [Shift], eax
     mov eax, [esi]
-    mov [Shift + 3], eax
+    mov edx, 31
+    sub edx, [esi + 4]
+    mov eax, [eax + edx]
+    mov [Shift + 2], eax
+    mov eax, [esi + 4]
+    add eax, 2
+    mov ebx, [ShiftRight]
+    mov [Shift + eax], ebx
     
     ; print the shift
     mov edi, [esi + 4]
@@ -482,6 +514,7 @@ ShiftCursorToAnAdress:
     mov eax, [ebp + 8]
     mov [ShiftAdress], eax
 
+ComeBack:
     mov esp, ebp
     pop ebp
     ret
@@ -566,6 +599,7 @@ _SquareRoot:
     mov eax, esi
     mov ebx, 2
     div ebx
+    xor edi, edi
 
     ; here's the loop to calculate the sqrt() -> we follow this equation : ((X_original / X_actuel) + X_actuel) / 2 until the results are roughly the same every time.
 newtonLoop:
