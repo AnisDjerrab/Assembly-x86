@@ -6,8 +6,7 @@ segment .data
     BoolState db 1
     ShiftAdress dd 1
     ShiftCommun db 27, '['
-    ShiftLeft db 'D'
-    ShiftRight db 'C'
+    ShiftRight db 'G'
     Empty db "                                "
     filename db 'Operations.log', 0
     permissions equ 0644
@@ -88,71 +87,74 @@ MainLoop:
     int 0x80
 
     ; parse it
-    cmp [InHistory], 1
+    cmp byte [InHistory], 1
     je History
-    cmp [buffer], '0'
+    cmp byte [buffer], '0'
     jb NonNumericCaracter
-    cmp [buffer], '9'
+    cmp byte [buffer], '9'
     ja NonNumericCaracter
-    mov [AdressWhereToWrite], 0
-    cmp [BoolState], 1
+    cmp byte [BoolState], 1
     je case1
-    cmp [BoolState], 2
+    cmp byte [BoolState], 2
     je case2
     jmp MainLoop
 case1:
-    mov [AdressWhereToWrite], 8
-    cmp [numberOfCaractersInNumberOne], 9
-    je MainLoop
+    mov [AdressWhereToWrite], 2
+    cmp byte [numberOfCaractersInNumberOne], 9
+    ja MainLoop
     mov dl, [buffer]
-    mov ecx, numberOfCaractersInNumberOne
+    xor ecx, ecx
+    movzx ecx, byte [numberOfCaractersInNumberOne]
     mov [number1 + ecx], dl
     inc [numberOfCaractersInNumberOne]
-    mov eax, [numberOfCaractersInNumberOne]
-    add eax, [AdressWhereToWrite]
+    movzx eax, byte [numberOfCaractersInNumberOne]
+    movzx ecx, byte [AdressWhereToWrite]
+    add eax, ecx
     jmp PrintNumber
 case2:
-    mov [AdressWhereToWrite], 22
-    cmp [numberOfCaractersInNumberTwo], 9
-    je MainLoop
+    mov [AdressWhereToWrite], 15
+    cmp byte [numberOfCaractersInNumberTwo], 9
+    ja MainLoop
     mov dl, [buffer]
-    mov ecx, numberOfCaractersInNumberTwo
+    xor ecx, ecx
+    movzx ecx, byte [numberOfCaractersInNumberTwo]
     mov [number2 + ecx], dl
     inc [numberOfCaractersInNumberTwo]
-    mov eax, [numberOfCaractersInNumberTwo]
-    add eax, [AdressWhereToWrite]
+    movzx eax, byte [numberOfCaractersInNumberTwo]
+    movzx ecx, byte [AdressWhereToWrite]
+    add eax, ecx
     jmp PrintNumber
 case3:
-    cmp [buffer], 'q'
+    cmp byte [buffer], 'q'
     mov [InHistory], 0
     jmp AC
 NonNumericCaracter:
-    cmp [buffer], '/'
+    cmp byte [buffer], '/'
     je PrintOperation
-    cmp [buffer], '+'
+    cmp byte [buffer], '+'
     je PrintOperation
-    cmp [buffer], '-'
+    cmp byte [buffer], '-'
     je PrintOperation
-    cmp [buffer], '^'
+    cmp byte [buffer], '^'
     je PrintOperation
-    cmp [buffer], 's'
+    cmp byte [buffer], 's'
     je DoSquareRoot
-    cmp [buffer], 'h'
+    cmp byte [buffer], 'h'
     je SeeHistory
-    cmp [buffer], '='
+    cmp byte [buffer], '='
     je PrintResult
-    cmp [buffer], 8
+    cmp byte [buffer], 8
     je DeleteLastEnteredCaraceter
-    cmp [buffer], 'q'
+    cmp byte [buffer], 'q'
     je Exit
-    cmp [buffer], 'r'
+    cmp byte [buffer], 'r'
     je AC
-    cmp [buffer], '*'
+    cmp byte [buffer], '*'
     je PrintOperation
     jmp MainLoop
 PrintOperation:
     ; move to the right index
-    mov eax, 22
+    mov eax, 12
     push eax
     call ShiftCursorToAnAdress
     ; print the operation
@@ -172,9 +174,9 @@ DoSquareRoot:
     jmp SecondCase
 FirstCase:
     mov eax, number1
-    push eax
-    mov ebx, numberOfCaractersInNumberOne
+    movzx ebx, byte [numberOfCaractersInNumberOne]
     push ebx
+    push eax
     call _convert_in_Binary
     push eax
     call _SquareRoot
@@ -194,7 +196,7 @@ FirstCase:
 SecondCase:
     mov eax, number2
     push eax
-    mov ebx, numberOfCaractersInNumberTwo
+    movzx ebx, byte [numberOfCaractersInNumberTwo]
     push ebx
     call _convert_in_Binary
     push eax
@@ -255,16 +257,16 @@ SeeHistory:
 PrintResult:
     ; convert first number in binary
     mov eax, number1
-    mov ebx, numberOfCaractersInNumberOne
-    push eax
+    movzx ebx, byte [numberOfCaractersInNumberOne]
     push ebx
+    push eax
     call _convert_in_Binary
     mov esi, eax
     ; convert second number in binary
     mov eax, number2
-    mov ebx, numberOfCaractersInNumberTwo
-    push eax
+    movzx ebx, byte [numberOfCaractersInNumberTwo]
     push ebx
+    push eax
     call _convert_in_Binary
     mov edi, eax
     ; do the operation
@@ -397,6 +399,7 @@ AC:
     mov [number2 + 4], 0
     mov [number2 + 8], 0
     mov [operator], 0
+    mov [BoolState], 1
     jmp CalculatorRestart
 
 DeleteLastEnteredCaraceter:
@@ -493,9 +496,9 @@ ShiftCursorToAnAdress:
     mov eax, [ShiftCommun]
     mov [Shift], eax
     mov eax, [esi]
-    mov edx, 31
-    sub edx, [esi + 4]
-    mov eax, [eax + edx]
+    mov edx, [esi + 4]
+    dec edx
+    mov eax, [eax]
     mov [Shift + 2], eax
     mov eax, [esi + 4]
     add eax, 2
@@ -571,12 +574,15 @@ _convert_in_Binary:
     mov ebp, esp
     mov esi, [ebp + 8]
     mov ecx, [ebp + 12]
-    xor edi, edi
-    xor eax, eax
-loop3:
-    cmp [ecx], edi
+    cmp ecx, 0
     je return
-    mov bl, [esi + edi]
+    dec ecx
+    xor eax, eax
+    xor edi, edi
+loop3:
+    cmp ecx, edi
+    je return
+    mov byte bl, [esi + edi]
     sub bl, '0'
     inc edi
     mov ebx, 10
