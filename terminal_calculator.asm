@@ -31,6 +31,8 @@ segment .bss
     LargeBuffer resb 34 
     LastEntriesInLogFile resb 340
     index resb 4
+    TextSaved resb 9
+    IndexSaved resb 4
 segment .text
     global _start
 _start:
@@ -318,6 +320,15 @@ Reset:
     push eax
     call _convert_in_ASCII
     mov edi, eax
+    mov eax, [edi]
+    mov ebx, [eax]
+    mov [TextSaved], ebx
+    mov ebx, [eax + 4]
+    mov [TextSaved + 4], ebx
+    mov bl, [eax + 8]
+    mov [TextSaved + 8], bl
+    mov eax, [edi + 4]
+    mov [IndexSaved], eax
     ; open the log file
     mov eax, 5
     mov ebx, filename
@@ -374,6 +385,17 @@ Reset:
     ; print the result
     mov [LargeBuffer], '='
     mov [LargeBuffer + 1], ' '
+    mov esi, [TextSaved]
+    mov [temp2], esi
+    mov esi, [TextSaved + 4]
+    mov [temp2 + 4], esi
+    mov cl, [TextSaved + 8]
+    mov [temp2 + 8], cl
+    mov ecx, temp2
+    mov [results], ecx
+    mov ecx, [IndexSaved]
+    mov [results + 4], ecx
+    
     mov esi, [edi]
     mov ecx, esi
     mov esi, [ecx + 23]
@@ -576,18 +598,19 @@ _convert_in_Binary:
     mov ecx, [ebp + 12]
     cmp ecx, 0
     je return
-    dec ecx
     xor eax, eax
     xor edi, edi
 loop3:
     cmp ecx, edi
     je return
-    mov byte bl, [esi + edi]
-    sub bl, '0'
+    mov bl, [buffer]
+    mov bl, [esi + edi]
+    mov [buffer], bl
+    sub byte [buffer], '0'
     inc edi
     mov ebx, 10
     mul ebx
-    movzx ebx, bl ; moves the value of bl inside ebx, and erase the other 24 bits
+    movzx ebx, byte [buffer] ; moves the value of bl inside ebx, and erase the other 24 bits
     add eax, ebx
     jmp loop3
 return:
