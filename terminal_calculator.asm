@@ -263,14 +263,14 @@ PrintResult:
     push ebx
     push eax
     call _convert_in_Binary
-    mov esi, eax
+    mov edi, eax
     ; convert second number in binary
     mov eax, number2
     movzx ebx, byte [numberOfCaractersInNumberTwo]
     push ebx
     push eax
     call _convert_in_Binary
-    mov edi, eax
+    mov esi, eax
     ; do the operation
     cmp [operator], '+'
     je Addition
@@ -284,22 +284,22 @@ PrintResult:
     je Power
     jmp AC
 Addition:
-    add esi, edi
-    mov eax, esi
+    add edi, esi
+    mov eax, edi
     jmp Reset
 Substraction:
-    sub esi, edi
-    mov eax, esi
+    sub edi, esi
+    mov eax, edi
     jmp Reset
 Division:
-    mov eax, esi
-    mov ebx, edi
+    mov eax, edi
+    mov ebx, esi
     xor edx, edx
     div ebx
     jmp Reset
 Multiplication:
-    mov eax, esi
-    mov ebx, edi
+    mov eax, edi
+    mov ebx, esi
     mul ebx
     jmp Reset
 Power:
@@ -391,11 +391,12 @@ Reset:
     mov [temp2 + 4], esi
     mov cl, [TextSaved + 8]
     mov [temp2 + 8], cl
-    mov ecx, temp2
+    mov ecx, TextSaved
     mov [results], ecx
     mov ecx, [IndexSaved]
     mov [results + 4], ecx
     
+    mov edi, results
     mov esi, [edi]
     mov ecx, esi
     mov esi, [ecx + 23]
@@ -594,22 +595,21 @@ code6:
 _convert_in_Binary:
     push ebp
     mov ebp, esp
-    mov esi, [ebp + 8]
     mov ecx, [ebp + 12]
     cmp ecx, 0
     je return
     xor eax, eax
-    xor edi, edi
+    xor edx, edx
 loop3:
-    cmp ecx, edi
+    cmp ecx, edx
     je return
     mov bl, [buffer]
-    mov bl, [esi + edi]
+    mov ebx, [ebp + 8]
+    mov bl, [ebx + edx]
     mov [buffer], bl
     sub byte [buffer], '0'
-    inc edi
-    mov ebx, 10
-    mul ebx
+    inc edx
+    mul eax, eax, 10
     movzx ebx, byte [buffer] ; moves the value of bl inside ebx, and erase the other 24 bits
     add eax, ebx
     jmp loop3
