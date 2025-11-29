@@ -15,6 +15,8 @@ segment .data
     shiftToRowTwelve db 27, "[12B"
     shiftToBeginningOfLine db 27, "[1G"
     reset db 0
+    suppr340 db 27,'[340D'
+    suppr db 8, ' ', 8, 0
 segment .bss
     results resb 8
     temp1 resb 32
@@ -89,6 +91,9 @@ MainLoop:
     mov edx, 1
     int 0x80
 
+    cmp byte [InHistory], 1
+    je case3
+
     cmp byte [reset], 1
     je RestoreOriginalShape
 Continue:
@@ -147,8 +152,12 @@ case2:
     add eax, ecx
     jmp PrintNumber
 case3:
-    cmp byte [buffer], 'q'
-    mov [InHistory], 0
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, suppr340
+    mov edx, 6
+    int 0x80
+    mov byte [InHistory], 0
     jmp AC
 NonNumericCaracter:
     cmp byte [buffer], '/'
@@ -165,7 +174,7 @@ NonNumericCaracter:
     je SeeHistory
     cmp byte [buffer], '='
     je PrintResult
-    cmp byte [buffer], 8
+    cmp byte [buffer], 127
     je DeleteLastEnteredCaraceter
     cmp byte [buffer], 'q'
     je Exit
@@ -338,6 +347,15 @@ Reset:
     push eax
     call ShiftCursorToAnAdress
     ; Convert in ASCII
+    mov edi, temp1
+    mov ecx, 9
+    xor eax, eax
+    rep stosb
+
+    mov edi, temp2
+    mov ecx, 9
+    xor eax, eax
+    rep stosb
     mov eax, ebx
     push eax
     call _convert_in_ASCII
@@ -354,7 +372,7 @@ Reset:
     ; open the log file
     mov eax, 5
     mov ebx, filename
-    mov ecx, 0x241
+    mov ecx, 0x441        
     mov edx, permissions            
     int 0x80
     mov esi, eax
@@ -443,7 +461,7 @@ AC:
     mov [operator], 0
     mov [BoolState], 1
 
-    ; reset the value of number1 & number2 & temp1 & temp2 to zero
+    ; reset the value of number1 & number2 to zero
     mov edi, number1
     mov ecx, 9
     xor eax, eax
@@ -454,53 +472,41 @@ AC:
     xor eax, eax
     rep stosb
 
-    mov edi, temp1
-    mov ecx, 9
-    xor eax, eax
-    rep stosb
-
-    mov edi, temp2
-    mov ecx, 9
-    xor eax, eax
-    rep stosb
-
     jmp CalculatorRestart
 
 DeleteLastEnteredCaraceter:
-    cmp [BoolState], 1
+    cmp byte [BoolState], 1
     je DeleteCaracterOfNumberOne
     jmp DeleteCaracterOfNumberTwo
 DeleteCaracterOfNumberOne:
+    cmp byte [numberOfCaractersInNumberOne], 0
+    je MainLoop
     dec [numberOfCaractersInNumberOne]
-    mov edi, [numberOfCaractersInNumberOne]
-    mov esi, [number1 + edi]
-    mov [esi], ' '
-    ; change the cursor position
-    mov eax, 9
-    push eax
-    call ShiftCursorToAnAdress
-    ; write number 1
+    dec [AdressWhereToWrite]
+    movzx edi, byte [numberOfCaractersInNumberOne]
+    mov esi, edi
+    mov byte [number1 + esi], 0
+    
     mov eax, 4
     mov ebx, 1
-    mov ecx, number1
-    mov edx, 9
+    mov ecx, suppr
+    mov edx, 4
     int 0x80
 
     jmp MainLoop
 DeleteCaracterOfNumberTwo:
+    cmp byte [numberOfCaractersInNumberTwo], 0
+    je MainLoop
     dec [numberOfCaractersInNumberTwo]
-    mov edi, [numberOfCaractersInNumberTwo]
-    mov esi, [number2 + edi]
-    mov [esi], ' '
-    ; change the cursor position
-    mov eax, 22
-    push eax
-    call ShiftCursorToAnAdress
-    ; write number 1
+    dec [AdressWhereToWrite]
+    movzx edi, byte [numberOfCaractersInNumberTwo]
+    mov esi, edi
+    mov byte [number2 + esi], 0
+    
     mov eax, 4
     mov ebx, 1
-    mov ecx, number1
-    mov edx, 9
+    mov ecx, suppr
+    mov edx, 4
     int 0x80
 
     jmp MainLoop
@@ -599,6 +605,7 @@ _convert_in_ASCII:
     mov eax, [ebp + 8]
 
     mov esi, temp1
+
     ; this produces first an inversed number that'll have to be reversed.
 loop1: 
     mov ebx, 10
@@ -668,6 +675,9 @@ _SquareRoot:
     push ebp 
     mov ebp, esp
     mov esi, [ebp + 8]
+
+    push edi
+    push esi
     
     mov eax, esi
     mov ebx, 2
@@ -690,6 +700,8 @@ newtonLoop:
     mov ebx, 2
     xor ecx, ecx
 quit:
+    pop edi
+    pop esi
     mov esp, ebp
     pop ebp 
     ret
