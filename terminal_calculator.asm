@@ -292,15 +292,15 @@ PrintResult:
     call _convert_in_Binary
     mov esi, eax
     ; do the operation
-    cmp [operator], '+'
+    cmp byte [operator], '+'
     je Addition
-    cmp [operator], '-'
+    cmp byte [operator], '-'
     je Substraction
-    cmp [operator], '*'
+    cmp byte [operator], '*'
     je Multiplication
-    cmp [operator], '/'
+    cmp byte [operator], '/'
     je Division
-    cmp [operator], '^'
+    cmp byte [operator], '^'
     je Power
     jmp AC
 Addition:
@@ -312,10 +312,12 @@ Substraction:
     mov eax, edi
     jmp Reset
 Division:
+    push ecx
     mov eax, edi
     mov ebx, esi
     xor edx, edx
     div ebx
+    pop ecx
     jmp Reset
 Multiplication:
     mov eax, edi
@@ -438,14 +440,30 @@ Reset:
 AC:
     mov [numberOfCaractersInNumberOne], 0
     mov [numberOfCaractersInNumberTwo], 0
-    mov [number1], 0
-    mov [number1 + 4], 0
-    mov [number1 + 8], 0
-    mov [number2], 0
-    mov [number2 + 4], 0
-    mov [number2 + 8], 0
     mov [operator], 0
     mov [BoolState], 1
+
+    ; reset the value of number1 & number2 & temp1 & temp2 to zero
+    mov edi, number1
+    mov ecx, 9
+    xor eax, eax
+    rep stosb
+
+    mov edi, number2
+    mov ecx, 9
+    xor eax, eax
+    rep stosb
+
+    mov edi, temp1
+    mov ecx, 9
+    xor eax, eax
+    rep stosb
+
+    mov edi, temp2
+    mov ecx, 9
+    xor eax, eax
+    rep stosb
+
     jmp CalculatorRestart
 
 DeleteLastEnteredCaraceter:
