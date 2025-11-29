@@ -14,6 +14,7 @@ segment .data
     shiftToRowZero db 27, "[12A"
     shiftToRowTwelve db 27, "[12B"
     shiftToBeginningOfLine db 27, "[1G"
+    reset db 0
 segment .bss
     results resb 8
     temp1 resb 32
@@ -88,6 +89,9 @@ MainLoop:
     mov edx, 1
     int 0x80
 
+    cmp byte [reset], 1
+    je RestoreOriginalShape
+Continue:
     ; parse it
     cmp byte [InHistory], 1
     je History
@@ -100,6 +104,22 @@ MainLoop:
     cmp byte [BoolState], 2
     je case2
     jmp MainLoop
+RestoreOriginalShape:
+    ; shift to the beginning of the line
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, shiftToBeginningOfLine
+    mov edx, 4
+    int 0x80
+    mov [Shift], 0
+    ; reset the high bar
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, Empty
+    mov edx, 32
+    int 0x80
+    mov [reset], 0
+    jmp Continue
 case1:
     mov [AdressWhereToWrite], 2
     cmp byte [numberOfCaractersInNumberOne], 9
@@ -332,7 +352,8 @@ Reset:
     ; open the log file
     mov eax, 5
     mov ebx, filename
-    mov ecx, 0
+    mov ecx, 0x241
+    mov edx, permissions            
     int 0x80
     mov esi, eax
     mov eax, edi
@@ -372,6 +393,13 @@ Reset:
     mov eax, 6
     mov ebx, esi
     int 0x80
+    ; shift to the beginning of the line
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, shiftToBeginningOfLine
+    mov edx, 4
+    int 0x80
+    mov [Shift], 0
     ; reset the high bar
     mov eax, 4
     mov ebx, 1
@@ -385,12 +413,6 @@ Reset:
     ; print the result
     mov [LargeBuffer], '='
     mov [LargeBuffer + 1], ' '
-    mov esi, [TextSaved]
-    mov [temp2], esi
-    mov esi, [TextSaved + 4]
-    mov [temp2 + 4], esi
-    mov cl, [TextSaved + 8]
-    mov [temp2 + 8], cl
     mov ecx, TextSaved
     mov [results], ecx
     mov ecx, [IndexSaved]
@@ -399,17 +421,18 @@ Reset:
     mov edi, results
     mov esi, [edi]
     mov ecx, esi
-    mov esi, [ecx + 23]
+    mov esi, [ecx]
     mov [LargeBuffer + 2], esi
-    mov esi, [ecx + 27]
+    mov esi, [ecx + 4]
     mov [LargeBuffer + 6], esi
-    mov cl, [ecx + 31]
+    mov cl, [ecx + 8]
     mov [LargeBuffer + 10], cl
     mov eax, 4
     mov ebx, 1
     mov ecx, LargeBuffer
     mov edx, 11
     int 0x80
+    mov [reset], 1
 
     jmp AC
 AC:
@@ -500,6 +523,8 @@ ShiftCursorToAnAdress:
     push ebp
     mov ebp, esp
 
+    push ebx
+
     mov edi, [ebp + 8] ; this contains the length of the shift ! 
 
     ; first, shift to the beginning of line
@@ -541,6 +566,7 @@ ShiftCursorToAnAdress:
     mov [ShiftAdress], eax
 
 ComeBack:
+    pop ebx
     mov esp, ebp
     pop ebp
     ret
