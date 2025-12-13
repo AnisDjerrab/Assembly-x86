@@ -200,7 +200,7 @@ PrintOperation:
     mov [BoolState], 2
     jmp MainLoop
 DoSquareRoot:
-    cmp [BoolState], 1
+    cmp byte [BoolState], 1
     je FirstCase
     jmp SecondCase
 FirstCase:
@@ -224,6 +224,18 @@ FirstCase:
     mov ecx, [esi]
     mov edx, [esi + 4]
     int 0x80
+
+    mov eax, [esi]
+    mov [number1], eax
+    mov eax, [esi + 4]
+    mov [number1 + 4], eax
+    mov al, [esi + 8]
+    mov [number1 + 8], al
+
+    mov eax, [esi + 4]
+    mov [numberOfCaractersInNumberOne], eax
+
+    jmp MainLoop
 SecondCase:
     mov eax, number2
     push eax
@@ -246,6 +258,18 @@ SecondCase:
     mov ecx, esi
     mov edx, edi 
     int 0x80
+
+    mov eax, [esi]
+    mov [number2], eax
+    mov eax, [esi + 4]
+    mov [number2 + 4], eax
+    mov al, [esi + 8]
+    mov [number2 + 8], al
+
+    mov eax, [esi + 4]
+    mov [numberOfCaractersInNumberTwo], eax
+
+    jmp MainLoop
 SeeHistory:
     ; open the file
     mov eax, 5
@@ -548,6 +572,8 @@ ShiftCursorToAnAdress:
     mov ebp, esp
 
     push ebx
+    push esi
+    push eax
 
     mov edi, [ebp + 8] ; this contains the length of the shift ! 
 
@@ -563,6 +589,7 @@ ShiftCursorToAnAdress:
 
     push eax
     call _convert_in_ASCII
+    add esp, 4
 
     mov esi, eax
     mov eax, [ShiftCommun]
@@ -590,6 +617,8 @@ ShiftCursorToAnAdress:
     mov [ShiftAdress], eax
 
 ComeBack:
+    pop eax
+    pop esi 
     pop ebx
     mov esp, ebp
     pop ebp
@@ -674,12 +703,13 @@ return:
 _SquareRoot:
     push ebp 
     mov ebp, esp
-    mov esi, [ebp + 8]
 
     push edi
     push esi
+    mov esi, [ebp + 8]
     
     mov eax, esi
+    xor edx, edx
     mov ebx, 2
     div ebx
     xor edi, edi
@@ -700,8 +730,8 @@ newtonLoop:
     mov ebx, 2
     xor ecx, ecx
 quit:
-    pop edi
     pop esi
+    pop edi
     mov esp, ebp
     pop ebp 
     ret
